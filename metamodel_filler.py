@@ -16,7 +16,8 @@ def fill_metamodel(connection, delete_all=True):
         for p_name in concepts_df.columns:
             if p_name != 'labels':
                 # type(concept_row[p_name]) != float - фильтрация пустых значений
-                if p_name in ['name', 'description', 'eventName'] and type(concept_row[p_name]) != float:
+                if p_name in ['name', 'description', 'eventName', 'propertyName'] \
+                        and type(concept_row[p_name]) != float:
                     properties_str += f"{p_name}: '{concept_row[p_name]}', "
                 if p_name == 'nodeType':
                     properties_str += f"{p_name}: {concept_row[p_name].split(',')}, "
@@ -34,7 +35,9 @@ def fill_metamodel(connection, delete_all=True):
 
 if __name__ == '__main__':
     load_dotenv()
-    conn = nc.Neo4jConnection(uri=os.getenv("URI"), user=os.getenv("USERNAME"), pwd=os.getenv("PASSWORD"))
+    # conn = nc.Neo4jConnection(uri=os.getenv("URI"), user=os.getenv("USERNAME"), pwd=os.getenv("PASSWORD"))
+    conn = nc.Neo4jConnection(uri=os.getenv("URI_CLOUD"), user=os.getenv("USERNAME_CLOUD"),
+                              pwd=os.getenv("PASSWORD_CLOUD"))
     fill_metamodel(conn)
 
 
