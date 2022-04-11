@@ -14,10 +14,9 @@ def fill_metamodel(connection, delete_all=True):
     for _, concept_row in concepts_df.iterrows():
         properties_str = ''
         for p_name in concepts_df.columns:
-            if p_name != 'labels':
+            if p_name != 'labels' and type(concept_row[p_name]) != float:
                 # type(concept_row[p_name]) != float - фильтрация пустых значений
-                if p_name in ['name', 'description', 'eventName', 'propertyName'] \
-                        and type(concept_row[p_name]) != float:
+                if p_name in ['name', 'description', 'eventName', 'propertyName']:
                     properties_str += f"{p_name}: '{concept_row[p_name]}', "
                 if p_name == 'nodeType':
                     properties_str += f"{p_name}: {concept_row[p_name].split(',')}, "
