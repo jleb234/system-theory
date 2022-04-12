@@ -34,9 +34,9 @@ def fill_metamodel(connection, delete_all=True):
 
 if __name__ == '__main__':
     load_dotenv()
-    # conn = nc.Neo4jConnection(uri=os.getenv("URI"), user=os.getenv("USERNAME"), pwd=os.getenv("PASSWORD"))
-    conn = nc.Neo4jConnection(uri=os.getenv("URI_CLOUD"), user=os.getenv("USERNAME_CLOUD"),
-                              pwd=os.getenv("PASSWORD_CLOUD"))
+    conn = nc.Neo4jConnection(uri=os.getenv("URI"), user=os.getenv("USERNAME"), pwd=os.getenv("PASSWORD"))
+    # conn = nc.Neo4jConnection(uri=os.getenv("URI_CLOUD"), user=os.getenv("USERNAME_CLOUD"),
+    #                           pwd=os.getenv("PASSWORD_CLOUD"))
     fill_metamodel(conn)
 
 

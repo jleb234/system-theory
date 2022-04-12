@@ -31,7 +31,14 @@ def get_linked_entities(node_name, rel_type=""):
     entities_df = pd.concat([no_types_df, types_df])
 
     return entities_df.sort_values("rel_type")
-    # TODO в идеале это класс
+
+
+def get_properties_str(prs: dict):
+    """Преобразует словарь в строку свойств для Cypher-запроса"""
+    prs_str = ''
+    for key, value in prs.items():
+        prs_str += f"{key}: '{value}', "
+    return prs_str[:-2]
 
 
 def get_options(node_id, rel_type='иметь значение'):
@@ -44,22 +51,55 @@ def get_options(node_id, rel_type='иметь значение'):
     return [pr["name"] for pr in properties]
 
 
-def get_labels(p_entity):
+def add_entity(p_entity, p_properties, p_previous_prs, f_iteration=False, section_type='general'):
+    """Добавляет сущность или сущность со связью в онтологию"""
     labels = p_entity['nodeType'] + p_entity['node_labels']
     labels.remove('Meta')
-    return labels
 
+    prs_str = get_properties_str(p_properties)
 
-def add_entity(p_entity, p_properties, p_previous, f_iteration=False):
-    labels = get_labels(p_entity)
     if f_iteration:
-        query = f"CREATE (:{':'.join(labels)} {p_properties})"
+        labels.remove('Base')
+        query = f"MERGE (:{':'.join(labels)} {{{prs_str}}})"
+        res = conn.query(query)
+        return False if res == None else True
     else:
-        prev_labels = get_labels(p_previous)
-        query = f"MERGCE (a)-[:{p_entity['rel_type']} {{name: '{p_entity['rel_name']}'}}]" \
-                f"->(:{':'.join(labels)} {p_properties}) " \
-                f"WHERE ID(a) = {p_previous['node_id']}"
-    print(query)
+        pr_prs_str = get_properties_str(p_previous_prs)
+        match_prev = f"(prev {{{pr_prs_str}}})"
+        match_curr = f"(curr:{':'.join(labels)} {{{prs_str}}})"
+        query_1 = f"MERGE {match_prev}"
+        query_2 = f"MERGE {match_curr}"
+        query_3 = f"MATCH {match_prev}, {match_curr} " \
+                  f"MERGE (prev)-[:{p_entity['rel_type']} {{name: '{p_entity['rel_name']}'}}]->(curr)"
+        res_1 = conn.query(query_1)
+        res_2 = conn.query(query_2)
+        res_3 = conn.query(query_3)
+        return False if res_1 == None or res_2 == None or res_3 == None else True
+
+
+def get_graph_info(p_entity, p_previous, p_previous_prs):
+    """Рисует картинку о связи с предыдущей сущностью"""
+    previous_name = p_previous_prs['name'] if 'name' in p_previous_prs.keys() \
+        else p_previous_prs[list(p_previous_prs.keys())[0]]
+    graph = graphviz.Digraph()
+    graph.attr('node', shape='box')
+    graph.node(f"{p_previous['node_name']} «{previous_name}»")
+    graph.node(p_entity['node_name'])
+    if p_entity["start_node"] == p_previous['node_name'] or p_entity["start_node"] != p_entity["node_name"]:
+        graph.edge(f"{p_previous['node_name']} «{previous_name}»", p_entity['node_name'], label=p_entity['rel_name'])
+    else:
+        graph.edge(p_entity['node_name'], f"{p_previous['node_name']} «{previous_name}»", label=p_entity['rel_name'])
+    return graph
+
+
+def get_existing_nodes(p_entity, property_name, f_iteration):
+    labels = p_entity['nodeType'] + p_entity['node_labels']
+    labels.remove('Meta')
+    if f_iteration:
+        labels.remove('Base')
+
+    res = conn.query(f"MATCH (a:{':'.join(labels)}) RETURN a.{property_name} AS {property_name}")
+    return [i[property_name] for i in res]
 
 
 def generate_interface_section(
@@ -67,7 +107,7 @@ def generate_interface_section(
         optional=False,  # является ли связь с предыдущей сущностью опциональной
         first_iteration=False,  # является ли это первой итерацией (используется для форматирования заголовков)
         previous=None,  # информация о предыдущей сущности в формате Series
-        previous_name=None,  # информация о имени экземпляра предыдущей сущности (информация из поля ввода)
+        previous_prs=None,  # информация о свойствах экземпляра предыдущей сущности (информация из поля ввода)
         key_name=None,  # уникальный ключ для элементов интерфейса
         section_type='general'  # тип секции; возможные значения: types (родовидовые отношения с предыдущей сущностью)
 ):
@@ -82,12 +122,7 @@ def generate_interface_section(
 
     # вывод графической информации о связи с предыдущей связанной сущностью
     if not first_iteration and not section_type == 'types':
-        graph = graphviz.Digraph()
-        if entity["start_node"] == previous['node_name'] or entity["start_node"] != entity["node_name"]:
-            graph.edge(f"{previous['node_name']} «{previous_name}»", entity['node_name'], label=entity['rel_name'])
-        else:
-            graph.edge(entity['node_name'], f"{previous['node_name']} «{previous_name}»", label=entity['rel_name'])
-        st.graphviz_chart(graph)
+        st.graphviz_chart(get_graph_info(entity, previous, previous_prs))
 
     linked_entities = get_linked_entities(entity["node_name"])
 
@@ -95,7 +130,6 @@ def generate_interface_section(
     properties = {}
     has_types = False
     for _, linked_entity in linked_entities.iterrows():
-        # print(linked_entity)
         if linked_entity["rel_name"] == 'иметь свойство':
             options = get_options(linked_entity["node_id"])
             input_label = linked_entity["node_name"]
@@ -105,29 +139,41 @@ def generate_interface_section(
                 properties[linked_entity["property_name"]] = st.selectbox(
                     input_label, options=options, help=linked_entity["node_desc"], key=key_name)
             else:  # если заданных значений свойств нет, показываем поле ввода
-                properties[linked_entity["property_name"]] = st.text_input(
-                    input_label, help=linked_entity["node_desc"], key=key_name)
-            # print(properties)
+                if linked_entity["rel_type"] == "REQUIRED":
+                    inp1, inp2 = st.columns(2)
+                    input_data = inp1.text_input(input_label, help=linked_entity["node_desc"], key=key_name)
+                    existing_nodes = get_existing_nodes(entity, linked_entity["property_name"], first_iteration)
+                    selected_data = inp2.selectbox('Выбрать из существующих', key=key_name,
+                                 options=[''] + existing_nodes)
+                    properties[linked_entity["property_name"]] = input_data if selected_data == '' else selected_data
+                else:
+                    properties[linked_entity["property_name"]] = st.text_input(
+                        input_label, help=linked_entity["node_desc"], key=key_name)
+            print(properties)
         if linked_entity["rel_name"] == 'иметь вид' and linked_entity['start_node'] == entity["node_name"]:
             options = get_options(entity["node_id"], rel_type=linked_entity["rel_name"])
             node_type = st.selectbox("Вид", options=options, key=key_name)
             if st.checkbox("Заполнить информацию о виде", key=key_name):
-                entities = conn.query(f"MATCH (a {{name: '{node_type}'}}) "
-                                      f"RETURN a.name AS node_name, ID(a) AS node_id")
-                entities_df = pd.DataFrame.from_records(entities, columns=['node_name', 'node_id'])
+                entities = conn.query(f"MATCH (parent)-[{{name: 'иметь вид'}}]->(a {{name: '{node_type}'}}), "
+                                      f"(p_parent {{name: '{previous['node_name']}'}})-[r]->(parent)"
+                                      f"RETURN a.name AS node_name, ID(a) AS node_id, "
+                                      f"a.nodeType AS nodeType, labels(a) AS node_labels, "
+                                      f"r.name AS rel_name, TYPE(r) AS rel_type")
+                entities_df = pd.DataFrame.from_records(
+                    entities, columns=['node_name', 'node_id', 'nodeType', 'node_labels', 'rel_name', 'rel_type'])
                 for _, i in entities_df.iterrows():
-                    pr_name = generate_interface_section(
-                        i, section_type='types', key_name=previous_name + linked_entity['node_name'] + node_type)
-                    print(pr_name)
+                    pr_prs = generate_interface_section(i, section_type='types', previous_prs=previous_prs,
+                        key_name=previous_prs['name'] + linked_entity['node_name'] + node_type)
             has_types = True
 
     # кнопка "Добавить"
     if not has_types:
-        if st.button(f"Добавить {entity['node_name'].lower()}", key=key_name):
-            add_entity(entity, properties, previous, first_iteration)
-            # TODO добавление фрагмента в онтологию
+        col1, col2 = st.columns([8, 1])
+        if col1.button(f"Добавить {entity['node_name'].lower()}", key=key_name):
+            if add_entity(entity, properties, previous_prs, first_iteration, section_type):
+                col2.caption('Добавлено')
 
-    linked_entities_f = linked_entities[linked_entities["rel_name"] != "иметь свойство"]
+    linked_entities_f = linked_entities.query('rel_name != "иметь свойство" and rel_name != "иметь вид"')
     linked_entities_f = linked_entities_f[linked_entities_f["start_node"] == entity["node_name"]]
     if linked_entities_f.shape[0] > 0:
         # опция для показа связанные сущности (реализовано как чекбокс)
@@ -135,15 +181,13 @@ def generate_interface_section(
             # рекурсивный вызов функции для следуюшего узла, связанного с текущим обязательным исходящим отношением
             for n, linked_entity in linked_entities_f.iterrows():
                 optional = True if linked_entity['rel_type'] == 'OPTIONAL' else False
-                new_previous_name = properties['name'] if 'name' in properties.keys() else pr_name
+
+                # если нет свойств, то берем свойства, связанных отношением "быть типом" узлов
+                new_previous_prs = properties if len(properties.items()) > 0 else pr_prs
                 generate_interface_section(linked_entity, optional=optional, previous=entity,
-                                           previous_name=new_previous_name, key_name=new_previous_name + str(n))
-    if 'name' in properties.keys():
-        return properties['name']
-    elif len(properties.keys()) > 0:
-        return properties[list(properties.keys())[0]]
-    else:
-        return None
+                                           previous_prs=new_previous_prs,
+                                           key_name=new_previous_prs[list(new_previous_prs.keys())[0]] + str(n))
+    return properties
 
 
 load_dotenv()
@@ -158,4 +202,4 @@ entities = conn.query("MATCH (a:Base) RETURN a.name AS node_name, ID(a) AS node_
 entities_df = pd.DataFrame.from_records(entities, columns=['node_name', 'node_id', 'nodeType', 'node_labels'])
 
 for _, i in entities_df.iterrows():
-    generate_interface_section(i, first_iteration=True, previous_name='Base')
+    generate_interface_section(i, first_iteration=True, previous_prs={'name': 'Base'})
