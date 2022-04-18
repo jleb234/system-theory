@@ -1,7 +1,7 @@
 labels,nodeType,name,description,eventName,propertyName
-"Scenarios,Base,Meta",Scenario,Сценарий,,,
+"Scenarios,Meta,Base",Scenario,Сценарий,,,
 "Scenarios,Meta,PropertyKey",,Название сценария,,,name
-"Scenarios,Meta",ScenarioStep,Шаг сценария,,,
+"Scenarios,Meta,Base",ScenarioStep,Шаг сценария,,,
 "Scenarios,Meta,PropertyKey",,Описание шага сценария,,,name
 "Scenarios,Meta,PropertyKey",,Вид действия,,,actionType
 "Scenarios,Meta,PropertyValue",,Действие МП,,,
@@ -10,12 +10,12 @@ labels,nodeType,name,description,eventName,propertyName
 "Scenarios,Meta,PropertyValue",,Основная,,,
 "Scenarios,Meta,PropertyValue",,Альтернативная,,,
 "Scenarios,Meta,PropertyValue",,Негативная,,,
-"Interface,Meta",Screen,Экран,,,
+"Interface,Meta,Base",Screen,Экран,,,
 "Interface,Meta,PropertyKey",,Название экрана,Человекопонятное название экрана,,name
 "Interface,Meta,PropertyKey",,Название экрана в Figma,"Название экрана, которое фигурирует в макетах",,figmaName
-"Interface,Meta",Block,Блок элементов,,,
+"Interface,Meta,Base",Block,Блок элементов,,,
 "Interface,Meta,PropertyKey",,Название блока элементов,,,name
-"Interface,Meta",Element,Элемент экрана,,,
+"Interface,Meta,Base",Element,Элемент экрана,,,
 "Interface,Meta,PropertyKey",,Текст на кнопке,,,buttonText
 "Interface,Meta","Element,Button",Кнопка,,,
 "Interface,Meta","Element,GoodsCard",Карточка товара,,,
