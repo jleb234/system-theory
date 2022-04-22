@@ -38,7 +38,7 @@ class BranchType:
 class ScenarioStep(BehaviorItem):
     class_name = "Шаг сценария"
     class_description = "Атомарное действие пользователя или мобильного приложения"
-    labels = BehaviorItem.labels + ['Step']
+    labels = BehaviorItem.labels + ['ScenarioStep']
 
     def __init__(self, name: str, branch_type: BranchType):
         self.name = name
