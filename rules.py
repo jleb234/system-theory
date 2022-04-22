@@ -17,4 +17,4 @@ RULES.append(LOCATION_RULE)
 
 def trigger_rules(client):
     for rule in RULES:
-        client.execute(rule)
+        client.query(rule)

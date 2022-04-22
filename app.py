@@ -59,13 +59,13 @@ def get_options(node_id, rel_type='иметь значение'):
     return [pr["name"] for pr in properties]
 
 
-def add_entity(p_entity, p_properties, p_previous_prs, f_iteration=False, section_type='general'):
+def add_entity(p_entity, p_properties, p_previous_prs, f_iteration=False):
     """Добавляет сущность или сущность со связью в онтологию"""
     labels = p_entity['nodeType'] + p_entity['node_labels']
     labels.remove('Meta')
 
     prs_str = get_properties_str(p_properties)
-
+    print(p_entity)
     if f_iteration:
         labels.remove('Base')
         query = f"MERGE (:{':'.join(labels)} {{{prs_str}}})"
@@ -168,14 +168,13 @@ def generate_interface_section(
             node_type = st.selectbox("Вид", options=options, key=key_name)
             if st.checkbox("Заполнить информацию о виде", key=key_name):
                 entities = CONN.query(f"MATCH (parent)-[{{name: 'иметь вид'}}]->(a {{name: '{node_type}'}})"
-                                      # f", (p_parent {{name: '{previous['node_name']}'}})-[r]->(parent)"
+                                      f", (p_parent {{name: '{previous['node_name']}'}})-[r]->(parent)"
                                       f"RETURN a.name AS node_name, ID(a) AS node_id, "
                                       f"a.nodeType AS nodeType, labels(a) AS node_labels"
-                                      # f", r.name AS rel_name, TYPE(r) AS rel_type"
+                                      f", r.name AS rel_name, TYPE(r) AS rel_type"
                                       )
                 entities_df = pd.DataFrame.from_records(
-                    entities, columns=['node_name', 'node_id', 'nodeType', 'node_labels'])
-                        # 'rel_name', 'rel_type'
+                    entities, columns=['node_name', 'node_id', 'nodeType', 'node_labels', 'rel_name', 'rel_type'])
                 for _, i in entities_df.iterrows():
                     pr_prs = generate_interface_section(i, section_type='types', previous_prs=previous_prs,
                         key_name=previous_prs['name'] + linked_entity['node_name'] + node_type)
@@ -186,9 +185,9 @@ def generate_interface_section(
     if not has_types:
         col1, col2 = st.columns([8, 1])
         if col1.button(f"Добавить {entity['node_name'].lower()}", key=key_name):
-            if add_entity(entity, properties, previous_prs, first_iteration, section_type):
+            if add_entity(entity, properties, previous_prs, first_iteration):
                 col2.caption('Добавлено')
-                trigger_rules()
+                trigger_rules(CONN)
 
     linked_entities_f = linked_entities.query('rel_name != "иметь свойство" and rel_name != "иметь вид"')
     linked_entities_f = linked_entities_f[linked_entities_f["start_node"] == entity["node_name"]]
