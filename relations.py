@@ -19,10 +19,12 @@ class RelationItem:
         self.check_acceptable()
 
     def check_acceptable(self):
-        """Хотя бы один из вариантов source-target-branch из наборов ограничений должен быть валидным.
-        Поскольку все наследники имеют в labels метку предка, именно по этой метке определяется валидность."""
-        results = [(src in self.source.labels) and (trg in self.target.labels) for src, trg, brn in self.constraints]
-        if not any(results):
+        """Хотя бы один из вариантов source-target из наборов ограничений должен быть валидным.
+        Поскольку все наследники имеют в labels метку предка, именно по этой метке определяется,
+        подходит этот класс для этого типа отношений или нет."""
+
+        results = [(src in self.source.labels) and (trg in self.target.labels) for src, trg, _ in self.constraints]
+        if not any(results):  # Хотя бы один должен быть валидным
             raise RuntimeError("You can not use {}-{} source-target combination in a relation of type {}".format(
                 type(self.source).__name__, type(self.target).__name__, type(self).__name__))
 
@@ -47,7 +49,3 @@ class Preceede(RelationItem):
 class Include(RelationItem):
     rel_name = "включать в себя"
     constraints = [("Scenario", "ScenarioStep", "REQUIRED"), ("Block", "Element", "REQUIRED")]
-
-
-
-
