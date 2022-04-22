@@ -23,7 +23,7 @@ class RelationItem:
         Поскольку все наследники имеют в labels метку предка, именно по этой метке определяется валидность."""
         results = [(src in self.source.labels) and (trg in self.target.labels) for src, trg, brn in self.constraints]
         if not any(results):
-            raise RuntimeError("You can not use {}-{} source-target combination relation of type {}".format(
+            raise RuntimeError("You can not use {}-{} source-target combination in a relation of type {}".format(
                 type(self.source).__name__, type(self.target).__name__, type(self).__name__))
 
     def db_create_relation(self, connection):
