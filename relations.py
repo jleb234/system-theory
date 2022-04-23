@@ -19,14 +19,14 @@ class RelationItem:
         self.check_acceptable()
 
     def check_acceptable(self):
-        acceptable_sources = [i[0] for i in self.constraints]
-        acceptable_targets = [i[1] for i in self.constraints]
-        if type(self.source).__name__ not in acceptable_sources:
-            raise RuntimeError("You can not use {} class as a source for this type of relation".format(
-                type(self.source).__name__))
-        if type(self.target).__name__ not in acceptable_targets:
-            raise RuntimeError("You can not use {} class as a target for this type of relation".format(
-                type(self.target).__name__))
+        """Хотя бы один из вариантов source-target из наборов ограничений должен быть валидным.
+        Поскольку все наследники имеют в labels метку предка, именно по этой метке определяется,
+        подходит этот класс для этого типа отношений или нет."""
+
+        results = [(src in self.source.labels) and (trg in self.target.labels) for src, trg, _ in self.constraints]
+        if not any(results):  # Хотя бы один должен быть валидным
+            raise RuntimeError("You can not use {}-{} source-target combination in a relation of type {}".format(
+                type(self.source).__name__, type(self.target).__name__, type(self).__name__))
 
     def db_create_relation(self, connection):
         source_id = self.source.get_node_id(connection)
@@ -42,20 +42,10 @@ class RelationItem:
 
 
 class Preceede(RelationItem):
-    # rel_type = RelationType.OPTIONAL
     rel_name = "предшествовать"
     constraints = [("ScenarioStep", "ScenarioStep", "OPTIONAL")]
-
-    # def __repr__(self):
-    #     return "Шаг сценария «%s» предшествует шагу «%s»" % (self.source.name, self.target.name)
 
 
 class Include(RelationItem):
     rel_name = "включать в себя"
     constraints = [("Scenario", "ScenarioStep", "REQUIRED"), ("Block", "Element", "REQUIRED")]
-
-    # def __repr__(self):
-    #     return "Сценарий «%s» включает в себя шаг «%s»" % (self.source.name, self.target.name)
-
-
-
