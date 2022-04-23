@@ -1,5 +1,6 @@
 from enum import Enum
 from nodes import *
+from rules import trigger_rules
 
 
 # class RelationType(Enum):
@@ -32,13 +33,14 @@ class RelationItem:
         source_id = self.source.get_node_id(connection)
         target_id = self.target.get_node_id(connection)
         rel_type = None
-        for i in self.constraints:
-            if type(self.source).__name__ == i[0] and type(self.target).__name__ == i[1]:
-                rel_type = i[2]
+        for src, trg, rel_type in self.constraints:
+            if src in self.source.labels and trg in self.target.labels:
+                rel_type = rel_type
         query = f"MATCH (source), (target) " \
                 f"WHERE ID(source) = {source_id} AND ID(target) = {target_id} " \
-                f"CREATE (source)-[:{rel_type} {{name: '{self.rel_name}'}}]->(target)"
+                f"MERGE (source)-[:{rel_type} {{name: '{self.rel_name}'}}]->(target)"
         connection.query(query)
+        trigger_rules(connection)
 
 
 class Preceede(RelationItem):
@@ -49,3 +51,18 @@ class Preceede(RelationItem):
 class Include(RelationItem):
     rel_name = "включать в себя"
     constraints = [("Scenario", "ScenarioStep", "REQUIRED"), ("Block", "Element", "REQUIRED")]
+
+
+class BePartOf(RelationItem):
+    rel_name = "быть частью"
+    constraints = [("Element", "Block", "OPTIONAL")]
+
+
+class BePerformedOn(RelationItem):
+    rel_name = "осуществляться на"
+    constraints = [("ScenarioStep", "Screen", "REQUIRED")]
+
+
+class InteractWith(RelationItem):
+    rel_name = "предполагать взаимодействие с"
+    constraints = [("ScenarioStep", "Element", "OPTIONAL"), ("ScenarioStep", "Block", "OPTIONAL")]
