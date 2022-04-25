@@ -36,8 +36,8 @@ if __name__ == '__main__':
 
     today_screen = Screen("Сегодня", event_name="today")
     mymagnit_screen = Screen("Мой Магнит", event_name="myMagnit")
-    phone_screen = Screen("Экран ввода номера телефона", event_name="phoneEnter")
-    sms_screen = Screen("Экран ввода SMS-подверждения", event_name="smsCode")
+    phone_screen = Screen("Ввод номера телефона", event_name="phoneEnter")
+    sms_screen = Screen("Ввод SMS-подверждения", event_name="smsCode")
 
     today_screen.db_merge_node(conn)
     mymagnit_screen.db_merge_node(conn)

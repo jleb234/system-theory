@@ -14,6 +14,19 @@ LOCATION_RULE = "MATCH(step:ScenarioStep)-[{name: 'осуществляться 
                 "MERGE(el)-[:GENERATED {name: 'располагаться на'}]->(screen)"
 RULES.append(LOCATION_RULE)
 
+# если шаг сценария A относится к экрану В, то необходимо создать событие типа view (свойство action),
+# которое будет связано с шагом сценария А отношением "вызывать" и с экраном В – отношением "относиться к";
+# название события (свойство name) генерируется на основе свойства event_name экрана и типа события;
+# описание события (свойтсво description) генерируется на основе названия экрана
+SCREEN_VIEW_RULE = "MATCH (step:ScenarioStep)-[r {name: 'осуществляться на'}]->(screen:Screen) " \
+                   "MERGE (event:Event {action: 'view', description: 'Просмотр экрана «' + screen.name + '»'})" \
+                   "ON CREATE SET event.name = screen.event_name + '_' + event.action" \
+                   "MERGE (step)-[:GENERATED {name: 'вызывать'}]->(event)" \
+                   "MERGE (event)-[:GENERATED {name: 'относиться к'}]->(screen)"
+RULES.append(SCREEN_VIEW_RULE)
+
+
+
 
 def trigger_rules(client):
     for rule in RULES:
