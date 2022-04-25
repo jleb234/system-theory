@@ -33,7 +33,7 @@ class RelationItem:
         target_id = self.target.get_node_id(connection)
         query = f"MATCH (source), (target) " \
                 f"WHERE ID(source) = {source_id} AND ID(target) = {target_id} " \
-                f"CREATE (source)-[:{self.relation_type} {{name: '{self.rel_name}'}}]->(target)"
+                f"MERGE (source)-[:{self.relation_type} {{name: '{self.rel_name}'}}]->(target)"
         connection.query(query)
         trigger_rules(connection)
 
