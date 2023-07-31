@@ -1,0 +1,21 @@
+cookie:
+  expiry_days: 0
+  key: some_signature_key
+  name: some_cookie_name
+credentials:
+  usernames:
+    anutishna:
+      email: a.push@gmail.com
+      name: Anna K
+      password: $2b$12$5DQgvTuNdPR4J/X0wvL27uz.0lbBcJZ4rfwTIvRCXoTpVNeJPVUxi
+    jsmith:
+      email: jsmith@gmail.com
+      name: John Smith
+      password: $2b$12$CBVrjb0VYLOW2YFjBwzdR.nU/3AYyqs3MQ8SIbxye1oF3BCJXy/t6
+    rbriggs:
+      email: rbriggs@gmail.com
+      name: Rebecca Briggs
+      password: $2b$12$rMzwaq1e5/LGEKKK10DsQOmB2EJT4fPkzsFHpIVGa/xkBSgv72MwO
+preauthorized:
+  emails:
+  - melsby@gmail.com

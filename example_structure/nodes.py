@@ -1,5 +1,5 @@
 class NodeItem:
-    labels = ['B2C']
+    labels = []
     subquery = None
 
     def db_create_node(self, connection):
@@ -24,9 +24,8 @@ class Scenario(BehaviorItem):
                         "в рамках одного функционального блока"
     labels = BehaviorItem.labels + ['Scenario']
 
-    def __init__(self, name: str, user_label: str):
+    def __init__(self, name: str):
         self.name = name
-        self.labels = self.labels + [user_label]
         self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
 
 
@@ -41,9 +40,8 @@ class ScenarioStep(BehaviorItem):
     class_description = "Атомарное действие пользователя или мобильного приложения"
     labels = BehaviorItem.labels + ['ScenarioStep']
 
-    def __init__(self, name: str, branch_type: BranchType, user_label: str):
+    def __init__(self, name: str, branch_type: BranchType):
         self.name = name
-        self.labels = self.labels + [user_label]
         self.branch_type = branch_type
         self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', branch_type: '{self.branch_type}'}}"
 
@@ -64,9 +62,8 @@ class InterfaceItem(NodeItem):
     """Группа узлов, с помощью которых составляется формализованное описание интерфейса"""
     labels = NodeItem.labels + ['Interface']
 
-    def __init__(self, name: str, event_name: str, user_label: str):
+    def __init__(self, name: str, event_name: str):
         self.name = name
-        self.labels = self.labels + [user_label]
         self.event_name = event_name
         self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', event_name: '{self.event_name}'}}"
 

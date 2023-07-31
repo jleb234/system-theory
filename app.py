@@ -1,220 +1,189 @@
 from dotenv import load_dotenv
 import neo4j_db_connector as nc
-import os
 import streamlit as st
-import graphviz as graphviz
-import pandas as pd
-from rules import trigger_rules
+import os
+import nodes
+import relations
+import types
+from streamlit_agraph import agraph, Node, Edge, Config
+import streamlit_authenticator as stauth
+import yaml
+from yaml.loader import SafeLoader
 
 
 load_dotenv()
-CONN = nc.Neo4jConnection(uri=os.getenv("URI"), user=os.getenv("USERNAME"), pwd=os.getenv("PASSWORD"))
-# conn = nc.Neo4jConnection(uri=os.getenv("URI_CLOUD"),
-#                           user=os.getenv("USERNAME_CLOUD"),
-#                           pwd=os.getenv("PASSWORD_CLOUD"))
+conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
+                          user=os.getenv("NEO4J_USERNAME"),
+                          pwd=os.getenv("NEO4J_PASSWORD"))
 
 
-def get_linked_entities(node_name, rel_type=""):
-    """Получает информацию о связанных узлах"""
-    query = f"MATCH ({{name: '{node_name}'}})-[r {rel_type}]-(a) " \
-            f"RETURN a.name AS node_name, a.nodeType AS nodeType, ID(a) AS node_id, labels(a) AS node_labels, " \
-            f"a.description AS node_desc, a.propertyName AS property_name, " \
-            f"r.name AS rel_name, TYPE(r) AS rel_type, startNode(r).name AS start_node"
-    # print(query)
-    entities = CONN.query(query)
-    entities_df = pd.DataFrame.from_records(
-        entities,
-        columns=[
-            'node_name', 'nodeType', 'node_id', 'node_labels', 'node_desc', 'property_name',
-            'rel_name', 'rel_type', 'start_node'])
-    entities_df = entities_df[entities_df['rel_type'] != 'GENERATED']
-    # сортировка – для того, чтобы поля ввода генерировались последовательно (сначала для обязательных элементов)
-    entities_df['rel_type'] = pd.Categorical(entities_df['rel_type'], ["REQUIRED", "OPTIONAL"])
-
-    # убираем дубликаты связанных отношением "иметь вид" узлов, т.к. в интерфейсе для всех них предусмотрено одно поле
-    types_df = entities_df[entities_df['rel_name'] == 'иметь вид']
-    types_df = types_df[types_df['start_node'] != types_df['node_name']]
-    types_df = types_df.drop_duplicates(subset=['start_node'])
-    no_types_df = entities_df[entities_df['rel_name'] != 'иметь вид']
-    entities_df = pd.concat([no_types_df, types_df])
-
-    return entities_df.sort_values("rel_type")
+def get_all_subclasses(ni, res: list):
+    """Получение всех допустимых классов объектов"""
+    for node in ni.__subclasses__():
+        if isinstance(node.__init__, types.FunctionType):
+            res.append(node)
+        if len(node.__subclasses__()) > 0:
+            get_all_subclasses(node, res)
+    return res
 
 
-def get_properties_str(prs: dict):
-    """Преобразует словарь в строку свойств для Cypher-запроса"""
-    prs_str = ''
-    for key, value in prs.items():
-        prs_str += f"{key}: '{value}', "
-    return prs_str[:-2]
+def get_text_input_value(lbl, values):
+    v = st.text_input(lbl)
+    values.append(v)
 
 
-def get_options(node_id, rel_type='иметь значение'):
-    """Получает список значений свойств"""
-    query = f"MATCH (a)-[{{name: '{rel_type}'}}]->(b) " \
-            f"WHERE ID(a) = {node_id} " \
-            f"RETURN b.name AS name"
-    # print(query)
-    properties = CONN.query(query)
-    return [pr["name"] for pr in properties]
+def get_node_form(selected_ntype, node_types_avail, user_label):
+    """Отрисовка формы для добавления объекта"""
+    for node in node_types_avail:
+        if node.__name__ == selected_ntype:
+            attrs = [i for i in node.__init__.__code__.co_varnames if i != 'self']
+            with st.form("add_node"):
+                attr_values = []
+                for attr in attrs:
+                    if attr == 'user_label':
+                        attr_values.append(user_label)
+                    else:
+                        get_text_input_value(attr, attr_values)
+
+                submitted = st.form_submit_button("Создать")
+                if submitted:
+                    n = node(*attr_values)
+                    n.db_merge_node(conn)
+                    st.caption('Объект успешно создан')
 
 
-def add_entity(p_entity, p_properties, p_previous_prs, f_iteration=False):
-    """Добавляет сущность или сущность со связью в онтологию"""
-    labels = p_entity['nodeType'] + p_entity['node_labels']
-    labels.remove('Meta')
-
-    prs_str = get_properties_str(p_properties)
-    print(p_entity)
-    if f_iteration:
-        labels.remove('Base')
-        query = f"MERGE (:{':'.join(labels)} {{{prs_str}}})"
-        res = CONN.query(query)
-        return False if res == None else True
-    else:
-        pr_prs_str = get_properties_str(p_previous_prs)
-        match_prev = f"(prev {{{pr_prs_str}}})"
-        match_curr = f"(curr:{':'.join(labels)} {{{prs_str}}})"
-        query_1 = f"MERGE {match_prev}"
-        query_2 = f"MERGE {match_curr}"
-        query_3 = f"MATCH {match_prev}, {match_curr} " \
-                  f"MERGE (prev)-[:{p_entity['rel_type']} {{name: '{p_entity['rel_name']}'}}]->(curr)"
-        res_1 = CONN.query(query_1)
-        res_2 = CONN.query(query_2)
-        res_3 = CONN.query(query_3)
-        return False if res_1 == None or res_2 == None or res_3 == None else True
+def get_items_by_type(node_type, task_label, user_label):
+    query = f"MATCH (a:{node_type}:{task_label}:{user_label}) RETURN a.name AS name"
+    db_nodes = conn.query(query)
+    # print(db_nodes)
+    return [n["name"] for n in db_nodes]
 
 
-def get_graph_info(p_entity, p_previous, p_previous_prs):
-    """Рисует картинку о связи с предыдущей сущностью"""
-    previous_name = p_previous_prs['name'] if 'name' in p_previous_prs.keys() \
-        else p_previous_prs[list(p_previous_prs.keys())[0]]
-    graph = graphviz.Digraph()
-    graph.attr('node', shape='box')
-    graph.node(f"{p_previous['node_name']} «{previous_name}»")
-    graph.node(p_entity['node_name'])
-    if p_entity["start_node"] == p_previous['node_name'] or p_entity["start_node"] != p_entity["node_name"]:
-        graph.edge(f"{p_previous['node_name']} «{previous_name}»", p_entity['node_name'], label=p_entity['rel_name'])
-    else:
-        graph.edge(p_entity['node_name'], f"{p_previous['node_name']} «{previous_name}»", label=p_entity['rel_name'])
-    return graph
+def get_node_class(node_name, node_type, user_label):
+    """Получение экземпляра класса Nodes на основе его названия и типа"""
+    query = f'MATCH (a:{node_type} {{name: "{node_name}"}}) RETURN a'
+    db_nodes = conn.query(query)
+    print(db_nodes)
+    nds = get_all_subclasses(nodes.NodeItem, [])
+    for node in nds:
+        if node.__name__ == node_type:
+            attrs = [i for i in node.__init__.__code__.co_varnames if i != 'self']
+            print(attrs)
+            attr_values = []
+            for attr in attrs:
+                if attr == 'user_label':
+                    attr_values.append(user_label)
+                else:
+                    attr_values.append(db_nodes[0]['a'][attr])
+            print(attr_values)
+            return node(*attr_values)
 
 
-def get_existing_nodes(p_entity, property_name, f_iteration):
-    labels = p_entity['nodeType'] + p_entity['node_labels']
-    labels.remove('Meta')
-    if 'Base' in labels:
-        labels.remove('Base')
-    query = f"MATCH (a:{':'.join(labels)}) RETURN a.{property_name} AS {property_name}"
-    res = CONN.query(query)
-    return [i[property_name] for i in res]
+def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label):
+    """Отрисовка формы для добавления связи"""
+    for rel in rel_types_avail:
+        if rel.__name__ == selected_rtype:
+            for cnstr in rel.constraints:
+                main_node_type = cnstr[0]
+                related_node_type = cnstr[1]
+                print(main_node_type, related_node_type)
+                with st.form(f"add_node_{main_node_type}_{related_node_type}"):
+                    main_node_name = st.selectbox(main_node_type,
+                                                  get_items_by_type(main_node_type, task_label, user_label),
+                                                  key=f'n1_{main_node_type}_{related_node_type}')
+                    related_node_name = st.selectbox(related_node_type,
+                                                     get_items_by_type(related_node_type, task_label, user_label),
+                                                     key=f'n2_{main_node_type}_{related_node_type}')
+                    submitted = st.form_submit_button("Создать")
+                    if submitted:
+                        main_node = get_node_class(main_node_name, main_node_type, user_label)
+                        related_node = get_node_class(related_node_name, related_node_type, user_label)
+                        r = rel(main_node, related_node)
+                        r.db_create_relation(conn)
+                        st.caption('Связь успешно создана')
 
 
-def create_property_section(linked_entity, properties, entity, key_name, first_iteration):
-    options = get_options(linked_entity["node_id"])
-    # отмечаем звездочкой необязательные поля
-    input_label = linked_entity["node_name"] if linked_entity["rel_type"] == "REQUIRED" \
-        else linked_entity["node_name"] + ' *'
-    if len(options) > 0:  # если есть заданные значения свойств, показываем выпадающий список
-        selected_property = st.selectbox(
-            input_label, options=[''] + options, help=linked_entity["node_desc"], key=key_name)
-    else:  # если заданных значений свойств нет, показываем поле ввода
-        if linked_entity["rel_type"] == "REQUIRED":
-            inp1, inp2 = st.columns(2)
-            input_data = inp1.text_input(input_label, help=linked_entity["node_desc"], key=key_name)
-            existing_nodes = get_existing_nodes(entity, linked_entity["property_name"], first_iteration)
-            selected_data = inp2.selectbox('Выбрать из существующих', key=key_name,
-                                           options=[''] + existing_nodes)
-            selected_property = input_data if selected_data == '' else selected_data
-        else:
-            selected_property = st.text_input(input_label, help=linked_entity["node_desc"], key=key_name)
-    if selected_property != '':
-        properties[linked_entity["property_name"]] = selected_property
-    return properties
+def get_graph(task_label, user_label):
+    nodes = []
+    edges = []
+
+    query_nodes = f'MATCH (a:{task_label}:{user_label}) RETURN a'
+    db_nodes = conn.query(query_nodes)
+    for db_node in db_nodes:
+        # print(list(db_node['a'].labels)[-1:])
+        nodes.append(Node(id=db_node['a'].element_id, title=db_node['a']['name'],
+                          label=db_node['a']['name'], size=25))
+
+    query_rels = f'MATCH (:{task_label}:{user_label})-[r]-(:{task_label}:{user_label}) RETURN r'
+    db_rels = conn.query(query_rels)
+    for db_rel in db_rels:
+        edges.append(Edge(source=db_rel['r'].nodes[0].element_id,
+                          label=db_rel['r']['name'],
+                          type="CURVE_SMOOTH",
+                          target=db_rel['r'].nodes[1].element_id))
+
+    config = Config(width=750,
+                    height=500,
+                    directed=True,
+                    physics=True,
+                    hierarchical=False,
+                    )
+
+    return agraph(nodes=nodes, edges=edges, config=config)
 
 
-def generate_interface_section(
-        entity,  # текущая сущность с полями в формате Series
-        optional=False,  # является ли связь с предыдущей сущностью опциональной
-        first_iteration=False,  # является ли это первой итерацией (используется для форматирования заголовков)
-        previous=None,  # информация о предыдущей сущности в формате Series
-        previous_prs=None,  # информация о свойствах экземпляра предыдущей сущности (информация из поля ввода)
-        key_name=None,  # уникальный ключ для элементов интерфейса
-        section_type='general'  # тип секции; возможные значения: types (родовидовые отношения с предыдущей сущностью)
-):
-    # вывод заголовка / подзаголовка
-    header = entity["node_name"] + ' *' if optional else entity["node_name"]
-    if first_iteration:
-        st.header(header)
-    elif section_type == 'general':
-        st.markdown(f"### {header}")
-    else:
-        st.markdown(f"#### {header}")
+def get_task_content(task_label, user_label):
+    st.title('Аналитика пользовательского поведения в B2C-сервисе')
 
-    # вывод графической информации о связи с предыдущей связанной сущностью
-    if not first_iteration and not section_type == 'types':
-        st.graphviz_chart(get_graph_info(entity, previous, previous_prs))
+    st.header('Создание объектов')
+    node_types = get_all_subclasses(nodes.NodeItem, [])
+    node_labels = [i.__name__ for i in node_types]
+    selected_node_type = st.selectbox("Класс объекта", node_labels)
+    get_node_form(selected_node_type, node_types, user_label)
 
-    linked_entities = get_linked_entities(entity["node_name"])
+    st.header('Создание связей')
+    rel_types = get_all_subclasses(relations.RelationItem, [])
+    rel_labels = [i.__name__ for i in rel_types]
+    selected_rel_type = st.selectbox("Тип связи", rel_labels)
+    get_relation_form(selected_rel_type, rel_types, task_label, user_label)
 
-    # ввод свойств сущностей (при наличии)
-    properties = {}
-    has_types = False
-    for _, linked_entity in linked_entities.iterrows():
-        if linked_entity["rel_name"] == 'иметь свойство':
-            properties = create_property_section(linked_entity, properties, entity, key_name, first_iteration)
-        if linked_entity["rel_name"] == 'иметь вид' and linked_entity['start_node'] == entity["node_name"]:
-            options = get_options(entity["node_id"], rel_type=linked_entity["rel_name"])
-            node_type = st.selectbox("Вид", options=options, key=key_name)
-            if st.checkbox("Заполнить информацию о виде", key=key_name):
-                entities = CONN.query(f"MATCH (parent)-[{{name: 'иметь вид'}}]->(a {{name: '{node_type}'}})"
-                                      f", (p_parent {{name: '{previous['node_name']}'}})-[r]->(parent)"
-                                      f"RETURN a.name AS node_name, ID(a) AS node_id, "
-                                      f"a.nodeType AS nodeType, labels(a) AS node_labels"
-                                      f", r.name AS rel_name, TYPE(r) AS rel_type"
-                                      )
-                entities_df = pd.DataFrame.from_records(
-                    entities, columns=['node_name', 'node_id', 'nodeType', 'node_labels', 'rel_name', 'rel_type'])
-                for _, i in entities_df.iterrows():
-                    pr_prs = generate_interface_section(i, section_type='types', previous_prs=previous_prs,
-                        key_name=previous_prs['name'] + linked_entity['node_name'] + node_type)
-            has_types = True
-    print(properties)
+    st.header('Визуализация модели')
+    get_graph(task_label, user_label)
 
-    # кнопка "Добавить"
-    if not has_types:
-        col1, col2 = st.columns([8, 1])
-        if col1.button(f"Добавить {entity['node_name'].lower()}", key=key_name):
-            if add_entity(entity, properties, previous_prs, first_iteration):
-                col2.caption('Добавлено')
-                trigger_rules(CONN)
-
-    linked_entities_f = linked_entities.query('rel_name != "иметь свойство" and rel_name != "иметь вид"')
-    linked_entities_f = linked_entities_f[linked_entities_f["start_node"] == entity["node_name"]]
-    if linked_entities_f.shape[0] > 0:
-        # опция для показа связанные сущности (реализовано как чекбокс)
-        if st.checkbox("Заполнить связанную информацию", key=key_name):
-            # рекурсивный вызов функции для следуюшего узла, связанного с текущим обязательным исходящим отношением
-            for n, linked_entity in linked_entities_f.iterrows():
-                optional = True if linked_entity['rel_type'] == 'OPTIONAL' else False
-
-                # если нет свойств, то берем свойства, связанных отношением "быть типом" узлов
-                new_previous_prs = properties if len(properties.items()) > 0 else pr_prs
-                generate_interface_section(linked_entity, optional=optional, previous=entity,
-                                           previous_prs=new_previous_prs,
-                                           key_name=new_previous_prs[list(new_previous_prs.keys())[0]] + str(n))
-    return properties
+    del_btn = st.button("Удалить модель")
+    if del_btn:
+        conn.query(f"MATCH (n:{task_label}:{user_label}) DETACH DELETE n")
+        st.experimental_rerun()
 
 
 if __name__ == '__main__':
-    st.title('Создание онтологии проекта')
-    base_entities = CONN.query("MATCH (a:Meta:Base) RETURN a.name AS node_name")
-    selected_base = st.selectbox('Базовая сущность', options=[i['node_name'] for i in base_entities])
-    entities = CONN.query(f"MATCH (a:Meta:Base) WHERE a.name = '{selected_base}' "
-                          "RETURN a.name AS node_name, ID(a) AS node_id, a.nodeType AS nodeType, "
-                          "labels(a) AS node_labels")
-    entities_df = pd.DataFrame.from_records(entities, columns=['node_name', 'node_id', 'nodeType', 'node_labels'])
-    if st.checkbox('Начать', key='start'):
-        generate_interface_section(entities_df.iloc[:1].squeeze(), first_iteration=True, previous_prs={'name': 'Base'})
-    # for _, i in entities_df.iterrows():
-    #     generate_interface_section(i, first_iteration=True, previous_prs={'name': 'Base'})
+    with open('config.yaml') as file:
+        config = yaml.load(file, Loader=SafeLoader)
+
+    authenticator = stauth.Authenticate(
+        config['credentials'],
+        config['cookie']['name'],
+        config['cookie']['key'],
+        config['cookie']['expiry_days'],
+        config['preauthorized']
+    )
+
+    name, authentication_status, username = authenticator.login('Login', 'main')
+
+    try:
+        if authenticator.register_user('Register user', preauthorization=False):
+            st.success('User registered successfully')
+            with open('config.yaml', 'w') as file:
+                yaml.dump(config, file, default_flow_style=False)
+    except Exception as e:
+        st.error(e)
+
+    if st.session_state["authentication_status"]:
+        authenticator.logout('Выйти', 'main', key='unique_key')
+        get_task_content('B2C', username)
+    elif st.session_state["authentication_status"] is False:
+        st.error('Username/password is incorrect')
+    elif st.session_state["authentication_status"] is None:
+        st.warning('Please enter your username and password')
+
+
