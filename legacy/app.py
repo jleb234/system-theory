@@ -4,7 +4,7 @@ import os
 import streamlit as st
 import graphviz as graphviz
 import pandas as pd
-from rules import trigger_rules
+from b2c_rules import trigger_rules
 
 
 load_dotenv()

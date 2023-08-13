@@ -1,10 +1,5 @@
-from nodes import *
-from rules import trigger_rules
-
-# Relation types
-REQUIRED = 'REQUIRED'
-OPTIONAL = 'OPTIONAL'
-GENERATED = 'GENERATED'
+from b2c_nodes import *
+from b2c_rules import trigger_rules
 
 
 class RelationItem:
@@ -18,9 +13,9 @@ class RelationItem:
 
     @property
     def relation_type(self):
-        for src, trg, rel_type in self.constraints:
+        for src, trg in self.constraints:
             if src in self.source.labels and trg in self.target.labels:
-                return rel_type
+                return 1
         return None
 
     def validate(self):
@@ -38,26 +33,41 @@ class RelationItem:
         trigger_rules(connection)
 
 
+class HaveState(RelationItem):
+    rel_name = "иметь состояние"
+    constraints = [("User", "Reason")]
+
+
+class BeReason(RelationItem):
+    rel_name = "быть причиной"
+    constraints = [("Reason", "Step")]
+
+
 class Preceede(RelationItem):
     rel_name = "предшествовать"
-    constraints = [("ScenarioStep", "ScenarioStep", OPTIONAL)]
+    constraints = [("Step", "Step"), ("Action", "Action")]
 
 
-class Include(RelationItem):
-    rel_name = "включать в себя"
-    constraints = [("Scenario", "ScenarioStep", REQUIRED), ("Block", "Element", REQUIRED)]
+class Materialize(RelationItem):
+    rel_name = "материализоваться в"
+    constraints = [("Step", "Action")]
 
 
-class BePartOf(RelationItem):
-    rel_name = "быть частью"
-    constraints = [("Element", "Block", OPTIONAL)]
+class BeTarget(RelationItem):
+    rel_name = "быть целевым действием для"
+    constraints = [("Step", "Reason")]
 
 
-class BePerformedOn(RelationItem):
-    rel_name = "осуществляться на"
-    constraints = [("ScenarioStep", "Screen", REQUIRED)]
-
-
-class InteractWith(RelationItem):
+class Interact(RelationItem):
     rel_name = "предполагать взаимодействие с"
-    constraints = [("ScenarioStep", "Element", OPTIONAL), ("ScenarioStep", "Block", OPTIONAL)]
+    constraints = [("Action", "Interface")]
+
+
+class BePart(RelationItem):
+    rel_name = "являться частью"
+    constraints = [("Interface", "Interface")]
+
+
+class Trigger(RelationItem):
+    rel_name = "вызывать"
+    constraints = [("Action", "Event")]

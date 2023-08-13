@@ -1,6 +1,6 @@
-import nodes
-from nodes import BranchType
-import relations
+import b2c_relations
+import b2c_nodes
+from b2c_nodes import BranchType
 
 
 def test_relation_include_constants():  # TODO: Establish tests in best-practice way instead of this crutch

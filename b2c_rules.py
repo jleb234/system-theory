@@ -1,8 +1,3 @@
-class Rule:
-    def __int__(self, if_clause: str, then_clause: str):
-        self.if_clause = if_clause
-        self.then_clause = then_clause
-
 RULES = []
 
 # если шаг сценария 1 предшествует шагу сценария 2, а сценарий Х включает в себя шаг сценария 1,
