@@ -1,5 +1,5 @@
-from dotenv import load_dotenv
-import os
+# from dotenv import load_dotenv
+# import os
 import types
 import neo4j_db_connector as nc
 
@@ -12,10 +12,13 @@ from yaml.loader import SafeLoader
 import b2c_relations
 import b2c_nodes
 
-load_dotenv()
-conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
-                          user=os.getenv("NEO4J_USERNAME"),
-                          pwd=os.getenv("NEO4J_PASSWORD"))
+# load_dotenv()
+# conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
+#                           user=os.getenv("NEO4J_USERNAME"),
+#                           pwd=os.getenv("NEO4J_PASSWORD"))
+conn = nc.Neo4jConnection(uri='neo4j+s://6593603d.databases.neo4j.io',
+                          user='neo4j',
+                          pwd='FmOC-MkxetbgyyzVCYorjjo-l2_vZvnb1JFOc7TDFD8')
 
 
 def get_all_subclasses(ni, res: list):
