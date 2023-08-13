@@ -170,6 +170,9 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
         conn.query(f"MATCH (n:{task_label}:{user_label}) DETACH DELETE n")
         st.experimental_rerun()
 
+    # TODO: удаление объекта
+    # TODO: удаление связи
+
 
 if __name__ == '__main__':
     with open('pages/config.yaml') as file:
