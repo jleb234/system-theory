@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 import os
 import types
 import neo4j_db_connector as nc
+import pandas as pd
 
 import streamlit as st
 from streamlit_agraph import agraph, Node, Edge, Config
@@ -60,24 +61,29 @@ def get_items_by_type(node_type, task_label, user_label):
     return [n["name"] for n in db_nodes]
 
 
-def get_node_class(node_name, node_type, user_label, node_module):
-    """Получение экземпляра класса Nodes на основе его названия и типа"""
-    query = f'MATCH (a:{node_type} {{name: "{node_name}"}}) RETURN a'
-    db_nodes = conn.query(query)
-    print(db_nodes)
+def get_node_class_from_db_result(db_node, task_label, user_label, node_module):
+    """Получает экземпляра класса Nodes из элемента результата выполнения запроса, возвращающего список узлов"""
     nds = get_all_subclasses(node_module.NodeItem, [])
     for node in nds:
-        if node.__name__ == node_type:
-            attrs = [i for i in node.__init__.__code__.co_varnames if i != 'self']
-            print(attrs)
-            attr_values = []
-            for attr in attrs:
-                if attr == 'user_label':
-                    attr_values.append(user_label)
-                else:
-                    attr_values.append(db_nodes[0]['a'][attr])
-            print(attr_values)
-            return node(*attr_values)
+        for label in db_node['a'].labels:
+            if label not in [user_label, task_label]:
+                if node.__name__ == label:
+                    attrs = [i for i in node.__init__.__code__.co_varnames if i != 'self']
+                    attr_values = []
+                    for attr in attrs:
+                        if attr == 'user_label':
+                            attr_values.append(user_label)
+                        else:
+                            attr_values.append(db_node['a'][attr])
+                    return node(*attr_values)
+    return None
+
+
+def get_node_class(node_name, node_type, task_label, user_label, node_module):
+    """Получение экземпляра класса Nodes на основе его названия и типа"""
+    query = f'MATCH (a:{node_type}:{user_label}:{task_label} {{name: "{node_name}"}}) RETURN a'
+    db_nodes = conn.query(query)
+    return get_node_class_from_db_result(db_nodes[0], task_label, user_label, node_module)
 
 
 def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label, node_module):
@@ -97,8 +103,10 @@ def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label, n
                                                      key=f'n2_{main_node_type}_{related_node_type}')
                     submitted = st.form_submit_button("Создать")
                     if submitted:
-                        main_node = get_node_class(main_node_name, main_node_type, user_label, node_module)
-                        related_node = get_node_class(related_node_name, related_node_type, user_label, node_module)
+                        main_node = get_node_class(main_node_name, main_node_type,
+                                                   task_label, user_label, node_module)
+                        related_node = get_node_class(related_node_name, related_node_type,
+                                                      task_label, user_label, node_module)
                         r = rel(main_node, related_node)
                         r.db_create_relation(conn)
                         st.caption('Связь успешно создана')
@@ -134,8 +142,9 @@ def get_graph(task_label, user_label):
 
 def get_task_content(task_label, user_label, title, node_module, relations_module):
     st.title(title)
+    st.header('Создание модели')
 
-    st.header('Создание объектов')
+    st.subheader('Создание объектов')
     node_types = get_all_subclasses(node_module.NodeItem, [])
 
     node_dict = {}
@@ -146,7 +155,7 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
     selected_node_type = [i for i in node_dict if node_dict[i] == selected_node_label][0]
     get_node_form(selected_node_type, node_types, user_label)
 
-    st.header('Создание связей')
+    st.subheader('Создание связей')
     rel_types = get_all_subclasses(relations_module.RelationItem, [])
     rel_dict = {}
     for i in rel_types:
@@ -160,15 +169,30 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
     get_graph(task_label, user_label)
 
     # TODO Добавить таблицу с правилами и кнопку "Запустить правила"
-    # TODO Добавить редактируемые правила, если есть возможность скачивать и загружать модель
-    # TODO Добавить возможность скачивания и загрузки модели
+    # TODO Добавить редактируемые правила
+
+    st.header('Удаление')
+
+    st.subheader('Удаление объектов')
+    all_nodes_db = conn.query(f"MATCH (a:{task_label}:{user_label}) RETURN a")
+    all_nodes = [get_node_class_from_db_result(i, task_label, user_label, node_module) for i in all_nodes_db]
+    all_nodes_df = pd.DataFrame()
+    all_nodes_df['name'] = [i.name for i in all_nodes]
+    all_nodes_df['node'] = all_nodes
+    selected_node_name_for_removal = st.selectbox("Объект", all_nodes_df)
+    selected_index = all_nodes_df[all_nodes_df['name'] == selected_node_name_for_removal].index[0]
+    del_object_btn = st.button("Удалить объект")
+    if del_object_btn:
+        all_nodes_df.loc[selected_index]['node'].db_delete_node(conn) # TODO Добавить подтверждаение
+        st.experimental_rerun()
+
+    # TODO: удаление связи
+
+    st.subheader('Удаление модели')
     del_btn = st.button("Удалить модель")  # TODO Добавить подтверждаение
     if del_btn:
         conn.query(f"MATCH (n:{task_label}:{user_label}) DETACH DELETE n")
         st.experimental_rerun()
-
-    # TODO: удаление объекта
-    # TODO: удаление связи
 
 
 if __name__ == '__main__':

@@ -12,6 +12,9 @@ class NodeItem:
         result = connection.query(f"MATCH (n{self.subquery}) RETURN ID(n) AS node_id")
         return result[0]['node_id']
 
+    def db_delete_node(self, connection):
+        connection.query(f"MERGE (n{self.subquery}) DETACH DELETE n")
+
 
 class User(NodeItem):
     class_name = "Пользователь"
