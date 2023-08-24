@@ -65,7 +65,7 @@ def get_node_class_from_db_result(db_node, task_label, user_label, node_module):
     """Получает экземпляра класса Nodes из элемента результата выполнения запроса, возвращающего список узлов"""
     nds = get_all_subclasses(node_module.NodeItem, [])
     for node in nds:
-        for label in db_node['a'].labels:
+        for label in db_node.labels:
             if label not in [user_label, task_label]:
                 if node.__name__ == label:
                     attrs = [i for i in node.__init__.__code__.co_varnames if i != 'self']
@@ -74,7 +74,7 @@ def get_node_class_from_db_result(db_node, task_label, user_label, node_module):
                         if attr == 'user_label':
                             attr_values.append(user_label)
                         else:
-                            attr_values.append(db_node['a'][attr])
+                            attr_values.append(db_node[attr])
                     return node(*attr_values)
     return None
 
@@ -83,7 +83,7 @@ def get_node_class(node_name, node_type, task_label, user_label, node_module):
     """Получение экземпляра класса Nodes на основе его названия и типа"""
     query = f'MATCH (a:{node_type}:{user_label}:{task_label} {{name: "{node_name}"}}) RETURN a'
     db_nodes = conn.query(query)
-    return get_node_class_from_db_result(db_nodes[0], task_label, user_label, node_module)
+    return get_node_class_from_db_result(db_nodes[0]['a'], task_label, user_label, node_module)
 
 
 def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label, node_module):
@@ -140,6 +140,25 @@ def get_graph(task_label, user_label):
     return agraph(nodes=nodes, edges=edges, config=graph_config)
 
 
+def get_relation_class_from_db_result(db_relation, source_node, target_node, relation_module):
+    rels = get_all_subclasses(relation_module.RelationItem, [])
+    for rel in rels:
+        if rel.rel_name == db_relation['name']:
+            return rel(source_node, target_node)
+    return None
+
+
+def get_relations_from_db(user_label, task_label, node_module, relation_module):
+    result = conn.query(f"MATCH (s:{user_label}:{task_label})-[r]->(t:{user_label}:{task_label}) RETURN s,t,r")
+    rels_list = []
+    for relation in result:
+        source_node = get_node_class_from_db_result(relation['s'], task_label, user_label, node_module)
+        target_node = get_node_class_from_db_result(relation['t'], task_label, user_label, node_module)
+        relation = get_relation_class_from_db_result(relation['r'], source_node, target_node, relation_module)
+        rels_list.append((source_node, target_node, relation))
+    return rels_list
+
+
 def get_task_content(task_label, user_label, title, node_module, relations_module):
     st.title(title)
     st.header('Создание модели')
@@ -175,18 +194,34 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
 
     st.subheader('Удаление объектов')
     all_nodes_db = conn.query(f"MATCH (a:{task_label}:{user_label}) RETURN a")
-    all_nodes = [get_node_class_from_db_result(i, task_label, user_label, node_module) for i in all_nodes_db]
-    all_nodes_df = pd.DataFrame()
-    all_nodes_df['name'] = [i.name for i in all_nodes]
-    all_nodes_df['node'] = all_nodes
-    selected_node_name_for_removal = st.selectbox("Объект", all_nodes_df)
-    selected_index = all_nodes_df[all_nodes_df['name'] == selected_node_name_for_removal].index[0]
-    del_object_btn = st.button("Удалить объект")
-    if del_object_btn:
-        all_nodes_df.loc[selected_index]['node'].db_delete_node(conn) # TODO Добавить подтверждаение
-        st.experimental_rerun()
+    if len(all_nodes_db) == 0:
+        st.text("В модели пока нет объектов.")
+    else:
+        all_nodes = [get_node_class_from_db_result(i['a'], task_label, user_label, node_module) for i in all_nodes_db]
+        all_nodes_df = pd.DataFrame()
+        all_nodes_df['name'] = [i.name for i in all_nodes]
+        all_nodes_df['node'] = all_nodes
+        selected_node_name_for_removal = st.selectbox("Объект", all_nodes_df)
+        selected_node_index = all_nodes_df[all_nodes_df['name'] == selected_node_name_for_removal].index[0]
+        del_object_btn = st.button("Удалить объект")
+        if del_object_btn:
+            all_nodes_df.loc[selected_node_index]['node'].db_delete_node(conn)  # TODO Добавить подтверждаение
+            st.experimental_rerun()
 
-    # TODO: удаление связи
+    st.subheader('Удаление связи')
+    all_relations = get_relations_from_db(user_label, task_label, node_module, relations_module)
+    if len(all_relations) == 0:
+        st.text("В модели пока нет связей.")
+    else:
+        all_rels_df = pd.DataFrame()
+        all_rels_df['name'] = [f"{s.name} -> {r.rel_name} -> {t.name}" for s, t, r in all_relations]
+        all_rels_df['relation'] = [r for _, _, r in all_relations]
+        selected_rel_for_removal = st.selectbox("Связь", all_rels_df)
+        selected_rel_index = all_rels_df[all_rels_df['name'] == selected_rel_for_removal].index[0]
+        del_rel_btn = st.button("Удалить связь")
+        if del_rel_btn:
+            all_rels_df.loc[selected_rel_index]['relation'].db_delete_relation(conn)  # TODO Добавить подтверждаение
+            st.experimental_rerun()
 
     st.subheader('Удаление модели')
     del_btn = st.button("Удалить модель")  # TODO Добавить подтверждаение

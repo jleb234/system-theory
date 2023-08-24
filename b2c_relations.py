@@ -1,5 +1,4 @@
 from b2c_nodes import *
-from b2c_rules import trigger_rules
 
 
 class RelationItem:
@@ -30,7 +29,14 @@ class RelationItem:
                 f"WHERE ID(source) = {source_id} AND ID(target) = {target_id} " \
                 f"MERGE (source)-[:SEMANTIC {{name: '{self.rel_name}'}}]->(target)"
         connection.query(query)
-        trigger_rules(connection)
+
+    def db_delete_relation(self, connection):
+        source_id = self.source.get_node_id(connection)
+        target_id = self.target.get_node_id(connection)
+        query = f"MATCH (source)-[r:SEMANTIC {{name: '{self.rel_name}'}}]->(target) " \
+                f"WHERE ID(source) = {source_id} AND ID(target) = {target_id} " \
+                f"DELETE r"
+        connection.query(query)
 
 
 class HaveState(RelationItem):
