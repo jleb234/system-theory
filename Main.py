@@ -12,6 +12,7 @@ from yaml.loader import SafeLoader
 
 import b2c_relations
 import b2c_nodes
+import b2c_rules
 
 load_dotenv()
 conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
@@ -159,7 +160,7 @@ def get_relations_from_db(user_label, task_label, node_module, relation_module):
     return rels_list
 
 
-def get_task_content(task_label, user_label, title, node_module, relations_module):
+def get_task_content(task_label, user_label, title, node_module, relations_module, rules_module):
     st.title(title)
     st.header('Создание модели')
 
@@ -189,6 +190,8 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
 
     # TODO Добавить таблицу с правилами и кнопку "Запустить правила"
     # TODO Добавить редактируемые правила
+    rules_df = rules_module.data
+    edited_rules_df = st.data_editor(rules_df, num_rows="dynamic")
 
     st.header('Удаление')
 
@@ -248,7 +251,7 @@ if __name__ == '__main__':
         tab1, tab2 = st.tabs(["B2C", "Робот"])
         with tab1:
             get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',
-                             node_module=b2c_nodes, relations_module=b2c_relations)
+                             node_module=b2c_nodes, relations_module=b2c_relations, rules_module=b2c_rules)
         with tab2:
             st.title("Робот")
 
