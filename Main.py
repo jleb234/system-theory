@@ -134,8 +134,10 @@ def get_graph(task_label, user_label):
     graph_config = Config(width=750,
                           height=500,
                           directed=True,
-                          physics=True,
+                          physics=False,
                           hierarchical=False,
+                          collapsible=True,
+                          dragNodes=True,
                           )
 
     return agraph(nodes=nodes, edges=edges, config=graph_config)
@@ -188,10 +190,27 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
     st.header('Визуализация модели')
     get_graph(task_label, user_label)
 
-    # TODO Добавить таблицу с правилами и кнопку "Запустить правила"
-    # TODO Добавить редактируемые правила
+    st.subheader('Правила')
     rules_df = rules_module.data
-    edited_rules_df = st.data_editor(rules_df, num_rows="dynamic")
+    edited_rules_df = st.data_editor(rules_df, hide_index=True,
+                                     column_config={
+                                         "desc": st.column_config.TextColumn(
+                                             "Описание",
+                                             width='medium'
+                                         ),
+                                         "code": st.column_config.TextColumn(
+                                             "Код правила",
+                                             width='large'
+                                         )
+                                     },
+                                     num_rows="dynamic")
+
+    rules_btn = st.button("Запустить правила")
+    if rules_btn:
+        for _, row in edited_rules_df.iterrows():
+            if not row['code'] is None:
+                conn.query(row['code'])
+                st.caption('Правила успешно выполнены')
 
     st.header('Удаление')
 

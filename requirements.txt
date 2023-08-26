@@ -3,6 +3,6 @@ neo4j==5.8.1
 pandas==2.0.0
 python-dotenv==1.0.0
 PyYAML==6.0
-streamlit==1.22.0
+streamlit==1.25.0
 streamlit_agraph==0.0.45
 streamlit_authenticator==0.2.2
