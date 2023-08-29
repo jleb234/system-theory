@@ -14,6 +14,10 @@ import b2c_relations
 import b2c_nodes
 import b2c_rules
 
+import robot_nodes
+import robot_relations
+import robot_rules
+
 load_dotenv()
 conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
                           user=os.getenv("NEO4J_USERNAME"),
@@ -35,12 +39,12 @@ def get_text_input_value(lbl, values):
     values.append(v)
 
 
-def get_node_form(selected_ntype, node_types_avail, user_label):
+def get_node_form(selected_ntype, node_types_avail, user_label, task_label):
     """Отрисовка формы для добавления объекта"""
     for node in node_types_avail:
         if node.__name__ == selected_ntype:
             attrs = [i for i in node.__init__.__code__.co_varnames if i != 'self']
-            with st.form("add_node"):
+            with st.form("add_node" + task_label):
                 attr_values = []
                 for attr in attrs:
                     if attr == 'user_label':
@@ -113,15 +117,39 @@ def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label, n
                         st.caption('Связь успешно создана')
 
 
+def get_color_dict(n_types, colors):
+    res = {}
+    for i, n_type in enumerate(n_types):
+        if i + 1 >= len(colors):
+            colors.extend(colors)
+        res[n_type] = colors[i]
+    return res
+
+
 def get_graph(task_label, user_label):
     nodes = []
     edges = []
 
     query_nodes = f'MATCH (a:{task_label}:{user_label}) RETURN a'
     db_nodes = conn.query(query_nodes)
+
+    colors = ['#f6511d', '#ffb400', '#00a6ed', '#7fb800', '#0d2c54']
+
+    node_types = []
     for db_node in db_nodes:
+        n_labels = db_node['a'].labels
+        for label in n_labels:
+            if label not in [task_label, user_label] and label not in node_types:
+                node_types.append(label)
+
+    color_dict = get_color_dict(node_types, colors)
+    # print(color_dict)
+    for db_node in db_nodes:
+        n_label = [l for l in db_node['a'].labels if l not in [task_label, user_label]][0]
+        print(n_label)
+        print(db_node)
         nodes.append(Node(id=db_node['a'].element_id, title=db_node['a']['name'],
-                          label=db_node['a']['name'], size=25))
+                          label=db_node['a']['name'], size=25, color=color_dict[n_label]))
 
     query_rels = f'MATCH (:{task_label}:{user_label})-[r]-(:{task_label}:{user_label}) RETURN r'
     db_rels = conn.query(query_rels)
@@ -175,7 +203,7 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
     # node_labels = [i.__name__ for i in node_types]
     selected_node_label = st.selectbox("Класс объекта", node_dict.values())
     selected_node_type = [i for i in node_dict if node_dict[i] == selected_node_label][0]
-    get_node_form(selected_node_type, node_types, user_label)
+    get_node_form(selected_node_type, node_types, user_label, task_label)
 
     st.subheader('Создание связей')
     rel_types = get_all_subclasses(relations_module.RelationItem, [])
@@ -186,31 +214,26 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
     selected_rel_label = st.selectbox("Тип связи", rel_dict.values())
     selected_rel_type = [i for i in rel_dict if rel_dict[i] == selected_rel_label][0]
     get_relation_form(selected_rel_type, rel_types, task_label, user_label, node_module)
+    st.divider()
 
     st.header('Визуализация модели')
     get_graph(task_label, user_label)
+    st.divider()
 
-    st.subheader('Правила')
-    rules_df = rules_module.data
-    edited_rules_df = st.data_editor(rules_df, hide_index=True,
-                                     column_config={
-                                         "desc": st.column_config.TextColumn(
-                                             "Описание",
-                                             width='medium'
-                                         ),
-                                         "code": st.column_config.TextColumn(
-                                             "Код правила",
-                                             width='large'
-                                         )
-                                     },
-                                     num_rows="dynamic")
+    st.header('Правила')
+    rules_df = rules_module.create_rules(user_label, task_label)
+    for _, row in rules_df.iterrows():
+        st.code(row['code'], language='cypher')
+        st.caption(row['desc'])
 
-    rules_btn = st.button("Запустить правила")
+    rules_btn = st.button("Запустить правила", key="trigger_rules"+task_label)
     if rules_btn:
-        for _, row in edited_rules_df.iterrows():
+        for _, row in rules_df.iterrows():
             if not row['code'] is None:
                 conn.query(row['code'])
                 st.caption('Правила успешно выполнены')
+                st.experimental_rerun()
+    st.divider()
 
     st.header('Удаление')
 
@@ -225,7 +248,7 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
         all_nodes_df['node'] = all_nodes
         selected_node_name_for_removal = st.selectbox("Объект", all_nodes_df)
         selected_node_index = all_nodes_df[all_nodes_df['name'] == selected_node_name_for_removal].index[0]
-        del_object_btn = st.button("Удалить объект")
+        del_object_btn = st.button("Удалить объект", key="delete_node"+task_label)
         if del_object_btn:
             all_nodes_df.loc[selected_node_index]['node'].db_delete_node(conn)  # TODO Добавить подтверждаение
             st.experimental_rerun()
@@ -240,13 +263,13 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
         all_rels_df['relation'] = [r for _, _, r in all_relations]
         selected_rel_for_removal = st.selectbox("Связь", all_rels_df)
         selected_rel_index = all_rels_df[all_rels_df['name'] == selected_rel_for_removal].index[0]
-        del_rel_btn = st.button("Удалить связь")
+        del_rel_btn = st.button("Удалить связь", key="delete_relation"+task_label)
         if del_rel_btn:
             all_rels_df.loc[selected_rel_index]['relation'].db_delete_relation(conn)  # TODO Добавить подтверждаение
             st.experimental_rerun()
 
     st.subheader('Удаление модели')
-    del_btn = st.button("Удалить модель")  # TODO Добавить подтверждаение
+    del_btn = st.button("Удалить модель", key="delete_model"+task_label)  # TODO Добавить подтверждаение
     if del_btn:
         conn.query(f"MATCH (n:{task_label}:{user_label}) DETACH DELETE n")
         st.experimental_rerun()
@@ -272,7 +295,8 @@ if __name__ == '__main__':
             get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',
                              node_module=b2c_nodes, relations_module=b2c_relations, rules_module=b2c_rules)
         with tab2:
-            st.title("Робот")
+            get_task_content('Robot', username, 'Робот-плиткоукладчик',
+                             node_module=robot_nodes, relations_module=robot_relations, rules_module=robot_rules)
 
         authenticator.logout('Выйти', 'main', key='unique_key')
 
