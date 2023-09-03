@@ -291,11 +291,8 @@ if __name__ == '__main__':
     name, authentication_status, username = authenticator.login('Login', 'main')
 
     if st.session_state["authentication_status"]:
-        tab1, tab2 = st.tabs(["B2C", "Робот"])
+        tab1, tab2 = st.tabs(["Робот", "B2C"])
         with tab1:
-            get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',
-                             node_module=b2c_nodes, relations_module=b2c_relations, rules_module=b2c_rules)
-        with tab2:
             get_task_content('Robot', username, 'Робот-плиткоукладчик',
                              node_module=robot_nodes, relations_module=robot_relations, rules_module=robot_rules)
             st.divider()
@@ -303,6 +300,9 @@ if __name__ == '__main__':
             generate_btn = st.button("Сгенерировать код", key='generate_code_robot')
             if generate_btn:
                 st.code(get_code(conn, username), language='c')
+        with tab2:
+            get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',
+                             node_module=b2c_nodes, relations_module=b2c_relations, rules_module=b2c_rules)
         authenticator.logout('Выйти', 'main', key='unique_key')
 
     elif st.session_state["authentication_status"] is False:
