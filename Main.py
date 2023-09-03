@@ -167,6 +167,7 @@ def get_graph(task_label, user_label):
                           hierarchical=False,
                           collapsible=True,
                           dragNodes=True,
+                          key=task_label
                           )
 
     return agraph(nodes=nodes, edges=edges, config=graph_config)

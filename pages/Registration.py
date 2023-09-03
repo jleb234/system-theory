@@ -18,7 +18,7 @@ authenticator = stauth.Authenticate(
 try:
     if authenticator.register_user('Регистрация нового пользователя', preauthorization=False):
         st.success('Пользователь успешно зарегистрирован')
-        with open('config.yaml', 'w') as file:
+        with open('pages/config.yaml', 'w') as file:
             yaml.dump(config, file, default_flow_style=False)
 except Exception as e:
     st.error(e)

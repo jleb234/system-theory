@@ -8,14 +8,10 @@ credentials:
       email: a.push@gmail.com
       name: Anna K
       password: $2b$12$5DQgvTuNdPR4J/X0wvL27uz.0lbBcJZ4rfwTIvRCXoTpVNeJPVUxi
-    jsmith:
-      email: jsmith@gmail.com
-      name: John Smith
-      password: $2b$12$CBVrjb0VYLOW2YFjBwzdR.nU/3AYyqs3MQ8SIbxye1oF3BCJXy/t6
-    rbriggs:
-      email: rbriggs@gmail.com
-      name: Rebecca Briggs
-      password: $2b$12$rMzwaq1e5/LGEKKK10DsQOmB2EJT4fPkzsFHpIVGa/xkBSgv72MwO
+    demo:
+      email: demo@mail.ru
+      name: Demo
+      password: $2b$12$fDLA7BP.A9xnE07lmQfpg.lV8ildJDb.oSUmj6psZ.VbhXxPrF6V.
 preauthorized:
   emails:
   - melsby@gmail.com
