@@ -59,7 +59,10 @@ RETURN p.name, p.codename"""
     print(query)
     res = conn.query(query)
     print('get_condition', res)
-    return res[0]['p.codename'], res[0]['p.name']
+    if len(res) > 0:
+        return res[0]['p.codename'], res[0]['p.name']
+    else:
+        return None, None
 
 
 def get_operations_after_transition(predicate, conn, user_label):
