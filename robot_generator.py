@@ -38,8 +38,9 @@ RETURN state_1.name, state_2.name, state_2.codename"""
 def get_operations_before_transition(state_name, conn, user_label):
     """Получает все операции, которые необходимо выполнить до перехода"""
     query = f"""
-MATCH (state_1:State:{user_label} {{name: '{state_name}'}}), 
-(state_1)-[ {{name: 'предшествовать'}}]->(process_name)
+MATCH (s:State:{user_label} {{name: '{state_name}'}}), 
+(t)-[{{name: 'быть переходом из'}}]->(s),
+(process_name)-[ {{name: 'предшествовать'}}]->(t)
 RETURN process_name.name as name, process_name.codename as codename, labels(process_name) as labels
 """
     res = conn.query(query)
