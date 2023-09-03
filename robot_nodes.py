@@ -25,7 +25,7 @@ class State(NodeItem):
         self.name = name
         self.labels = self.labels + [user_label]
         self.codename = codename
-        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
 
 
 class Predicate(NodeItem):
@@ -37,7 +37,7 @@ class Predicate(NodeItem):
         self.name = name
         self.labels = self.labels + [user_label]
         self.codename = codename
-        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
 
 
 class Action(NodeItem):
@@ -49,7 +49,7 @@ class Action(NodeItem):
         self.name = name
         self.labels = self.labels + [user_label]
         self.codename = codename
-        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
 
 
 class Transition(NodeItem):

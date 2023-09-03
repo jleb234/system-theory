@@ -6,3 +6,4 @@ PyYAML==6.0
 streamlit==1.25.0
 streamlit_agraph==0.0.45
 streamlit_authenticator==0.2.2
+csnake==0.3.1

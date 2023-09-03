@@ -17,6 +17,7 @@ import b2c_rules
 import robot_nodes
 import robot_relations
 import robot_rules
+from robot_generator import get_code
 
 load_dotenv()
 conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
@@ -297,7 +298,11 @@ if __name__ == '__main__':
         with tab2:
             get_task_content('Robot', username, 'Робот-плиткоукладчик',
                              node_module=robot_nodes, relations_module=robot_relations, rules_module=robot_rules)
-
+            st.divider()
+            st.header("Генерация кода на основе модели")
+            generate_btn = st.button("Сгенерировать код", key='generate_code_robot')
+            if generate_btn:
+                st.code(get_code(conn, username), language='c')
         authenticator.logout('Выйти', 'main', key='unique_key')
 
     elif st.session_state["authentication_status"] is False:
