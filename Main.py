@@ -147,9 +147,10 @@ def get_graph(task_label, user_label):
     # print(color_dict)
     for db_node in db_nodes:
         n_label = [l for l in db_node['a'].labels if l not in [task_label, user_label]][0]
-        print(n_label)
-        print(db_node)
-        nodes.append(Node(id=db_node['a'].element_id, title=db_node['a']['name'],
+        # print(n_label)
+        print(db_node['a'])
+        nodes.append(Node(id=db_node['a'].element_id,
+                          title=str({i[0]: i[1] for i in db_node['a'].items() if i[0] != 'name'}),
                           label=db_node['a']['name'], size=25, color=color_dict[n_label]))
 
     query_rels = f'MATCH (:{task_label}:{user_label})-[r]-(:{task_label}:{user_label}) RETURN r'
