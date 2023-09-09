@@ -18,6 +18,9 @@ import robot_nodes
 import robot_relations
 import robot_rules
 from robot_generator import get_code
+from robot_generator_turtle import get_template
+
+import multiprocessing
 
 load_dotenv()
 conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
@@ -301,7 +304,12 @@ if __name__ == '__main__':
             st.header("Генерация кода на основе модели")
             generate_btn = st.button("Сгенерировать код", key='generate_code_robot')
             if generate_btn:
-                st.code(get_code(conn, username), language='c')
+                # st.code(get_code(conn, username), language='c')
+                st.code(get_template(conn, username), language='python')
+                from robot_generated_code import draw
+                t = multiprocessing.Process(target=draw)
+                t.start()
+
         with tab2:
             get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',
                              node_module=b2c_nodes, relations_module=b2c_relations, rules_module=b2c_rules)
