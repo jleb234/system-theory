@@ -13,7 +13,7 @@ def query_res_to_df(query_res):
             val = dict(i)[col]
             vals.append(val)
         data[col] = vals
-    return pd.DataFrame(data=data)
+    return pd.DataFrame(data=data).drop_duplicates(subset=[col for col in cols if col != 'labels'])
 
 
 def get_states(conn, user_label):
@@ -108,6 +108,7 @@ def get_code(connection, user_label):
         cwr_switch.add_switch_case(state_var)
 
         # действие, которое необходимо выполнить до перехода
+        # TODO увести внуть цикла
         pr_before = get_operations_before_transition(states[key_state], connection, user_label)
         add_process_lines(cwr_switch, pr_before)
 
