@@ -17,10 +17,9 @@ import b2c_rules
 import robot_nodes
 import robot_relations
 import robot_rules
-from robot_generator import get_code
+# from robot_generator import get_code
 from robot_generator_turtle import get_template
 
-import multiprocessing
 
 load_dotenv()
 conn = nc.Neo4jConnection(uri=os.getenv("NEO4J_URI"),
@@ -198,29 +197,30 @@ def get_relations_from_db(user_label, task_label, node_module, relation_module):
 
 def get_task_content(task_label, user_label, title, node_module, relations_module, rules_module):
     st.title(title)
-    st.header('Создание модели')
+    if user_label != 'demo':
+        st.header('Создание модели')
 
-    st.subheader('Создание объектов')
-    node_types = get_all_subclasses(node_module.NodeItem, [])
+        st.subheader('Создание объектов')
+        node_types = get_all_subclasses(node_module.NodeItem, [])
 
-    node_dict = {}
-    for i in node_types:
-        node_dict[i.__name__] = i.class_name
-    # node_labels = [i.__name__ for i in node_types]
-    selected_node_label = st.selectbox("Класс объекта", node_dict.values())
-    selected_node_type = [i for i in node_dict if node_dict[i] == selected_node_label][0]
-    get_node_form(selected_node_type, node_types, user_label, task_label)
+        node_dict = {}
+        for i in node_types:
+            node_dict[i.__name__] = i.class_name
+        # node_labels = [i.__name__ for i in node_types]
+        selected_node_label = st.selectbox("Класс объекта", node_dict.values())
+        selected_node_type = [i for i in node_dict if node_dict[i] == selected_node_label][0]
+        get_node_form(selected_node_type, node_types, user_label, task_label)
 
-    st.subheader('Создание связей')
-    rel_types = get_all_subclasses(relations_module.RelationItem, [])
-    rel_dict = {}
-    for i in rel_types:
-        rel_dict[i.__name__] = i.rel_name
-    # rel_labels = [i.__name__ for i in rel_types]
-    selected_rel_label = st.selectbox("Тип связи", rel_dict.values())
-    selected_rel_type = [i for i in rel_dict if rel_dict[i] == selected_rel_label][0]
-    get_relation_form(selected_rel_type, rel_types, task_label, user_label, node_module)
-    st.divider()
+        st.subheader('Создание связей')
+        rel_types = get_all_subclasses(relations_module.RelationItem, [])
+        rel_dict = {}
+        for i in rel_types:
+            rel_dict[i.__name__] = i.rel_name
+        # rel_labels = [i.__name__ for i in rel_types]
+        selected_rel_label = st.selectbox("Тип связи", rel_dict.values())
+        selected_rel_type = [i for i in rel_dict if rel_dict[i] == selected_rel_label][0]
+        get_relation_form(selected_rel_type, rel_types, task_label, user_label, node_module)
+        st.divider()
 
     st.header('Визуализация модели')
     get_graph(task_label, user_label)
@@ -232,53 +232,54 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
         st.code(row['code'], language='cypher')
         st.caption(row['desc'])
 
-    rules_btn = st.button("Запустить правила", key="trigger_rules"+task_label)
-    if rules_btn:
-        for _, row in rules_df.iterrows():
-            if not row['code'] is None:
-                conn.query(row['code'])
-                st.caption('Правила успешно выполнены')
+    if user_label != 'demo':
+        rules_btn = st.button("Запустить правила", key="trigger_rules"+task_label)
+        if rules_btn:
+            for _, row in rules_df.iterrows():
+                if not row['code'] is None:
+                    conn.query(row['code'])
+                    st.caption('Правила успешно выполнены')
+                    st.experimental_rerun()
+        st.divider()
+
+        st.header('Удаление')
+
+        st.subheader('Удаление объектов')
+        all_nodes_db = conn.query(f"MATCH (a:{task_label}:{user_label}) RETURN a")
+        if len(all_nodes_db) == 0:
+            st.text("В модели пока нет объектов.")
+        else:
+            all_nodes = [get_node_class_from_db_result(i['a'], task_label, user_label, node_module) for i in all_nodes_db]
+            all_nodes_df = pd.DataFrame()
+            all_nodes_df['name'] = [i.name for i in all_nodes]
+            all_nodes_df['node'] = all_nodes
+            selected_node_name_for_removal = st.selectbox("Объект", all_nodes_df)
+            selected_node_index = all_nodes_df[all_nodes_df['name'] == selected_node_name_for_removal].index[0]
+            del_object_btn = st.button("Удалить объект", key="delete_node"+task_label)
+            if del_object_btn:
+                all_nodes_df.loc[selected_node_index]['node'].db_delete_node(conn)  # TODO Добавить подтверждаение
                 st.experimental_rerun()
-    st.divider()
 
-    st.header('Удаление')
+        st.subheader('Удаление связи')
+        all_relations = get_relations_from_db(user_label, task_label, node_module, relations_module)
+        if len(all_relations) == 0:
+            st.text("В модели пока нет связей.")
+        else:
+            all_rels_df = pd.DataFrame()
+            all_rels_df['name'] = [f"{s.name} -> {r.rel_name} -> {t.name}" for s, t, r in all_relations]
+            all_rels_df['relation'] = [r for _, _, r in all_relations]
+            selected_rel_for_removal = st.selectbox("Связь", all_rels_df)
+            selected_rel_index = all_rels_df[all_rels_df['name'] == selected_rel_for_removal].index[0]
+            del_rel_btn = st.button("Удалить связь", key="delete_relation"+task_label)
+            if del_rel_btn:
+                all_rels_df.loc[selected_rel_index]['relation'].db_delete_relation(conn)  # TODO Добавить подтверждаение
+                st.experimental_rerun()
 
-    st.subheader('Удаление объектов')
-    all_nodes_db = conn.query(f"MATCH (a:{task_label}:{user_label}) RETURN a")
-    if len(all_nodes_db) == 0:
-        st.text("В модели пока нет объектов.")
-    else:
-        all_nodes = [get_node_class_from_db_result(i['a'], task_label, user_label, node_module) for i in all_nodes_db]
-        all_nodes_df = pd.DataFrame()
-        all_nodes_df['name'] = [i.name for i in all_nodes]
-        all_nodes_df['node'] = all_nodes
-        selected_node_name_for_removal = st.selectbox("Объект", all_nodes_df)
-        selected_node_index = all_nodes_df[all_nodes_df['name'] == selected_node_name_for_removal].index[0]
-        del_object_btn = st.button("Удалить объект", key="delete_node"+task_label)
-        if del_object_btn:
-            all_nodes_df.loc[selected_node_index]['node'].db_delete_node(conn)  # TODO Добавить подтверждаение
+        st.subheader('Удаление модели')
+        del_btn = st.button("Удалить модель", key="delete_model"+task_label)  # TODO Добавить подтверждаение
+        if del_btn:
+            conn.query(f"MATCH (n:{task_label}:{user_label}) DETACH DELETE n")
             st.experimental_rerun()
-
-    st.subheader('Удаление связи')
-    all_relations = get_relations_from_db(user_label, task_label, node_module, relations_module)
-    if len(all_relations) == 0:
-        st.text("В модели пока нет связей.")
-    else:
-        all_rels_df = pd.DataFrame()
-        all_rels_df['name'] = [f"{s.name} -> {r.rel_name} -> {t.name}" for s, t, r in all_relations]
-        all_rels_df['relation'] = [r for _, _, r in all_relations]
-        selected_rel_for_removal = st.selectbox("Связь", all_rels_df)
-        selected_rel_index = all_rels_df[all_rels_df['name'] == selected_rel_for_removal].index[0]
-        del_rel_btn = st.button("Удалить связь", key="delete_relation"+task_label)
-        if del_rel_btn:
-            all_rels_df.loc[selected_rel_index]['relation'].db_delete_relation(conn)  # TODO Добавить подтверждаение
-            st.experimental_rerun()
-
-    st.subheader('Удаление модели')
-    del_btn = st.button("Удалить модель", key="delete_model"+task_label)  # TODO Добавить подтверждаение
-    if del_btn:
-        conn.query(f"MATCH (n:{task_label}:{user_label}) DETACH DELETE n")
-        st.experimental_rerun()
 
 
 if __name__ == '__main__':
@@ -298,7 +299,12 @@ if __name__ == '__main__':
     if st.session_state["authentication_status"]:
         tab1, tab2 = st.tabs(["Робот", "B2C"])
         with tab1:
-            get_task_content('Robot', username, 'Робот-плиткоукладчик',
+            with st.expander("Варианты заданий"):
+                st.image("robot_variants.png", width=300)
+                with open("robot_description.md", mode='r') as f:
+                    st.markdown(f.read())
+
+            get_task_content('Robot', username, 'Моделирование траектории робота',
                              node_module=robot_nodes, relations_module=robot_relations, rules_module=robot_rules)
             st.divider()
             st.header("Генерация кода на основе модели")
@@ -306,9 +312,6 @@ if __name__ == '__main__':
             if generate_btn:
                 # st.code(get_code(conn, username), language='c')
                 st.code(get_template(conn, username), language='python')
-                from robot_generated_code import draw
-                t = multiprocessing.Process(target=draw)
-                t.start()
 
         with tab2:
             get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',

@@ -59,9 +59,9 @@ class BePredicate(RelationItem):
     constraints = [("Predicate", "Transition")]
 
 
-class Preceede(RelationItem):
-    rel_name = "предшествовать"
-    constraints = [("Action", "Transition")]
+# class Preceede(RelationItem):
+#     rel_name = "предшествовать"
+#     constraints = [("Action", "Transition")]
 
 
 class Call(RelationItem):
