@@ -4,6 +4,10 @@ cookie:
   name: some_cookie_name
 credentials:
   usernames:
+    1_test:
+      email: test2@test.test
+      name: 1_test
+      password: $2b$12$HCQLysn5KcXtTIycaWBFAu/n5/Nk5L0P.v0CVS3pYOQI9jDPpunJG
     anutishna:
       email: a.push@gmail.com
       name: Anna K
@@ -12,6 +16,14 @@ credentials:
       email: demo@mail.ru
       name: Demo
       password: $2b$12$fDLA7BP.A9xnE07lmQfpg.lV8ildJDb.oSUmj6psZ.VbhXxPrF6V.
+    test:
+      email: test@test.test
+      name: test
+      password: $2b$12$8b7t3RKptW9o76S0Ao1CXuPOtYq6wUFUr50Bk05DW1a5qo8Z9VKSW
+    test1:
+      email: test1@test.test
+      name: test1
+      password: $2b$12$5EiIdDxkiqlh9kYKD9leXOLdqgWvWSXLTrbSmTidRAIRitI4o.6C6
 preauthorized:
   emails:
   - melsby@gmail.com

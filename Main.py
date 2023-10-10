@@ -13,6 +13,7 @@ from yaml.loader import SafeLoader
 import b2c_relations
 import b2c_nodes
 import b2c_rules
+from b2c_generator import get_events
 
 import robot_nodes
 import robot_relations
@@ -64,14 +65,17 @@ def get_node_form(selected_ntype, node_types_avail, user_label, task_label):
 
 def get_items_by_type(node_type, task_label, user_label):
     query = f"MATCH (a:{node_type}:{task_label}:{user_label}) RETURN a.name AS name"
+    print(query)
     db_nodes = conn.query(query)
-    # print(db_nodes)
+    print(db_nodes)
     return [n["name"] for n in db_nodes]
 
 
 def get_node_class_from_db_result(db_node, task_label, user_label, node_module):
     """Получает экземпляра класса Nodes из элемента результата выполнения запроса, возвращающего список узлов"""
     nds = get_all_subclasses(node_module.NodeItem, [])
+    # print(db_node)
+    # print(nds)
     for node in nds:
         for label in db_node.labels:
             if label not in [user_label, task_label]:
@@ -101,7 +105,7 @@ def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label, n
             for cnstr in rel.constraints:
                 main_node_type = cnstr[0]
                 related_node_type = cnstr[1]
-                print(main_node_type, related_node_type)
+                # print(main_node_type, related_node_type)
                 with st.form(f"add_node_{main_node_type}_{related_node_type}"):
                     main_node_name = st.selectbox(main_node_type,
                                                   get_items_by_type(main_node_type, task_label, user_label),
@@ -115,12 +119,14 @@ def get_relation_form(selected_rtype, rel_types_avail, task_label, user_label, n
                                                    task_label, user_label, node_module)
                         related_node = get_node_class(related_node_name, related_node_type,
                                                       task_label, user_label, node_module)
+                        # print(main_node)
+                        # print(related_node)
                         r = rel(main_node, related_node)
                         r.db_create_relation(conn)
                         st.caption('Связь успешно создана')
 
 
-def get_color_dict(n_types, colors):
+def get_color_dict(n_types, colors, task_label):
     res = {}
     for i, n_type in enumerate(n_types):
         if i + 1 >= len(colors):
@@ -136,7 +142,7 @@ def get_graph(task_label, user_label):
     query_nodes = f'MATCH (a:{task_label}:{user_label}) RETURN a'
     db_nodes = conn.query(query_nodes)
 
-    colors = ['#f6511d', '#ffb400', '#00a6ed', '#7fb800', '#0d2c54']
+    colors = ['#f6511d', '#ffb400', '#00a6ed', '#7fb800', '#0d2c54', '#a2a2a2']
 
     node_types = []
     for db_node in db_nodes:
@@ -145,12 +151,14 @@ def get_graph(task_label, user_label):
             if label not in [task_label, user_label] and label not in node_types:
                 node_types.append(label)
 
-    color_dict = get_color_dict(node_types, colors)
+    color_dict = get_color_dict(node_types, colors, task_label)
     # print(color_dict)
     for db_node in db_nodes:
-        n_label = [l for l in db_node['a'].labels if l not in [task_label, user_label]][0]
+        n_label = [l for l in db_node['a'].labels
+                   if l not in [task_label, user_label,
+                                'View', 'Click', 'Scroll', 'Type', 'Button', 'Screen', 'Banner', 'Block']][0]
         # print(n_label)
-        print(db_node['a'])
+        # print(db_node['a'])
         nodes.append(Node(id=db_node['a'].element_id,
                           title=str({i[0]: i[1] for i in db_node['a'].items() if i[0] != 'name'}),
                           label=db_node['a']['name'], size=25, color=color_dict[n_label]))
@@ -198,6 +206,7 @@ def get_relations_from_db(user_label, task_label, node_module, relation_module):
 def get_task_content(task_label, user_label, title, node_module, relations_module, rules_module):
     st.title(title)
     if user_label != 'demo':
+    # if True:
         st.header('Создание модели')
 
         st.subheader('Создание объектов')
@@ -233,6 +242,7 @@ def get_task_content(task_label, user_label, title, node_module, relations_modul
         st.caption(row['desc'])
 
     if user_label != 'demo':
+    # if True:
         rules_btn = st.button("Запустить правила", key="trigger_rules"+task_label)
         if rules_btn:
             for _, row in rules_df.iterrows():
@@ -314,8 +324,18 @@ if __name__ == '__main__':
                 st.code(get_template(conn, username), language='python')
 
         with tab2:
+            with st.expander("Варианты заданий"):
+                with open("b2c_description.md", mode='r') as f:
+                    st.markdown(f.read())
+                st.image("b2c_example.jpg")
+
             get_task_content('B2C', username, 'Аналитика пользовательского поведения в B2C-сервисе',
                              node_module=b2c_nodes, relations_module=b2c_relations, rules_module=b2c_rules)
+            st.divider()
+            st.header("Генерация документации на основе модели")
+            generate_b2c_btn = st.button("Сгенерировать документацию", key='generate_b2c')
+            if generate_b2c_btn:
+                st.markdown(get_events(conn, username))
         authenticator.logout('Выйти', 'main', key='unique_key')
 
     elif st.session_state["authentication_status"] is False:

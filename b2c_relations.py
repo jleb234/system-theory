@@ -77,3 +77,8 @@ class BePart(RelationItem):
 class Trigger(RelationItem):
     rel_name = "вызывать"
     constraints = [("Action", "Event")]
+
+
+class SubClassOf(RelationItem):
+    rel_name = "быть подклассом"
+    constraints = [("User", "User")]

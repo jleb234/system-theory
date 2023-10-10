@@ -58,22 +58,49 @@ class Action(NodeItem):
                         "в набор которых материализуется шаг сценария"
     labels = NodeItem.labels + ['Action']
 
+
+class View(Action):
+    class_name = "Просмотр"
+    class_description = "Просмотр или появление в поле видимости какого-либо интерфейсного элемента"
+    labels = Action.labels + ['View']
+
     def __init__(self, name: str, user_label: str):
         self.name = name
         self.labels = self.labels + [user_label]
         self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
 
 
-class ViewAction(Action):
-    class_name = "Просмотр"
-    class_description = "Просмотр или появление в поле видимости какого-либо интерфейсного элемента"
-    labels = Action.labels + ['View']
-
-
-class ClickAction(Action):
+class Click(Action):
     class_name = "Нажатие"
     class_description = "Нажатие (например, на кнопку или баннер)"
     labels = Action.labels + ['Click']
+
+    def __init__(self, name: str, user_label: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
+
+
+class Scroll(Action):
+    class_name = "Прокрутка"
+    class_description = "Прокрутка (например, экрана или слайдера)"
+    labels = Action.labels + ['Scroll']
+
+    def __init__(self, name: str, user_label: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
+
+
+class Type(Action):
+    class_name = "Набор текста"
+    class_description = "Набор текста"
+    labels = Action.labels + ['Type']
+
+    def __init__(self, name: str, user_label: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
 
 
 class Interface(NodeItem):
@@ -81,22 +108,53 @@ class Interface(NodeItem):
     class_description = "Элемент пользовательского интерфейса, с которым пользователь осуществляет взаимодействие"
     labels = NodeItem.labels + ['Interface']
 
-    def __init__(self, name: str, user_label: str):
-        self.name = name
-        self.labels = self.labels + [user_label]
-        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
 
-
-class ButtonInterface(Interface):
+class Button(Interface):
     class_name = "Кнопка"
     class_description = "Кнопка"
-    labels = Action.labels + ['Button']
+    labels = Interface.labels + ['Button']
+
+    def __init__(self, name: str, user_label: str, codename: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.codename = codename
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
 
 
-class ScreenInterface(Interface):
+class Screen(Interface):
     class_name = "Экран"
     class_description = "Экран"
-    labels = Action.labels + ['Screen']
+    labels = Interface.labels + ['Screen']
+
+    def __init__(self, name: str, user_label: str, codename: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.codename = codename
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
+
+
+class Banner(Interface):
+    class_name = "Баннер"
+    class_description = "Баннер"
+    labels = Interface.labels + ['Banner']
+
+    def __init__(self, name: str, user_label: str, codename: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.codename = codename
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
+
+
+class Block(Interface):
+    class_name = "Блок"
+    class_description = "Блок"
+    labels = Interface.labels + ['Block']
+
+    def __init__(self, name: str, user_label: str, codename: str):
+        self.name = name
+        self.labels = self.labels + [user_label]
+        self.codename = codename
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
 
 
 class Event(NodeItem):
@@ -106,8 +164,7 @@ class Event(NodeItem):
                         "пользователя"
     labels = NodeItem.labels + ['Event']
 
-    def __init__(self, name: str, user_label: str, codename: str):
+    def __init__(self, name: str, user_label: str):
         self.name = name
         self.labels = self.labels + [user_label]
-        self.codename = codename
-        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}', codename: '{self.codename}'}}"
+        self.subquery = f":{':'.join(self.labels)} {{name: '{self.name}'}}"
